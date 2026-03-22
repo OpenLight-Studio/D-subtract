@@ -1,4 +1,4 @@
-#include "math.cpp"
+#include "./libs/math.cpp"
 
 // 【主函数入口】
 // argc: 命令行参数的个数 (Argument Count)
