@@ -3,7 +3,8 @@ CXX = g++
 CXXFLAGS = -std=c++17 -O2 -Wall -Wextra
 
 dsubtract: main.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $<
+	mkdir ./build/
+	$(CXX) $(CXXFLAGS) -o ./build/$@ $<
 
 clean:
 	rm -f dsubtract
