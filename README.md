@@ -18,11 +18,17 @@ factor ::= number | float | id | id() | ( expr )
 注释：// 行注释
 
 ## 使用
-编译器支持从命令行代码或 .ds 文件编译程序，生成 x86-64 机器码并写入 output.bin
+编译器将程序编译为 x86-64 机器码并写入 output.bin，然后直接运行。
 
 示例：
 ```
-./build/dsubtract "let x = 5"
-./build/dsubtract example.ds
+./target/release/dsubtract "let x = 5"
+./target/release/dsubtract example.ds
 ```
-生成机器码到 output.bin，可独立执行。
+生成机器码到 output.bin 并执行，打印退出码。
+
+## 构建
+```bash
+cd dsubtract
+cargo build --release
+```
