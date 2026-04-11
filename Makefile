@@ -3,10 +3,16 @@ CXX = g++
 CXXFLAGS = -std=c++17 -O2 -Wall -Wextra
 
 dsubtract: main.cpp
-	mkdir ./build/
+	mkdir -p ./build/
 	$(CXX) $(CXXFLAGS) -o ./build/$@ $<
 
-clean:
-	rm -f dsubtract
+asm: main.cpp
+	$(CXX) -S $(CXXFLAGS) -o dsubtract.s $<
 
-.PHONY: clean
+dsubtract-asm: dsubtract.s
+	$(CXX) -o dsubtract-asm $< -lstdc++
+
+clean:
+	rm -f dsubtract dsubtract.s dsubtract-asm
+
+.PHONY: clean asm dsubtract-asm

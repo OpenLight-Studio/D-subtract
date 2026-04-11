@@ -1,4 +1,6 @@
 #include "./libs/math.cpp"
+#include <fstream>
+#include <sstream>
 
 // 【主函数入口】
 // argc: 命令行参数的个数 (Argument Count)
@@ -6,28 +8,46 @@
 int main(int argc, char* argv[]) {
 
     // 【参数校验】
-    // 我们只需要 1 个额外参数（即数学表达式字符串）。
-    // 加上程序名本身，argc 应该等于 2。
-    // 如果不等于 2，说明用户没给表达式，或者给多了。
-    if (argc != 2) {
-        // cerr 是标准错误输出流，通常显示为红色，区别于 cout
-        std::cerr << "Usage: " << argv[0] << " \"<expression>\"\n";
-        std::cerr << "Example: " << argv[0] << " \"1 + 2 * 3\"\n";
-        return 1; // 返回非 0 值表示程序异常退出
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <code or .ds file>\n";
+        std::cerr << "Example: " << argv[0] << " \"let x = 5\"\n";
+        std::cerr << "Or: " << argv[0] << " program.ds\n";
+        return 1;
+    }
+
+    std::string code;
+    std::string input = argv[1];
+
+    if (input.find(".ds") != std::string::npos) {
+        // 从 .ds 文件读取
+        std::ifstream file(input);
+        if (!file) {
+            std::cerr << "Error: Cannot open file " << input << std::endl;
+            return 1;
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        code = buffer.str();
+    } else {
+        // 直接作为代码字符串
+        code = input;
     }
 
     try {
         // 【构建解析器】
-        // argv[1] 就是用户在命令行输入的那个字符串，比如 "12+3*(4-5)"
-        // 构造函数内部会自动进行词法分析和语法分析
-        Parser parser(argv[1]);
+        // code 是用户输入的代码字符串
+        Parser parser(code);
 
-        // 【执行计算】
-        // 调用 evaluate() 开始递归下降分析并返回最终结果
-        long result = parser.evaluate();
+        // 【生成汇编代码】
+        // 调用 generateCode() 生成计算表达式的汇编代码
+        auto code = parser.generateCode();
 
-        // 【输出结果】
-        std::cout << result << std::endl;
+        // 【写入汇编代码到文件】
+        std::ofstream outfile("output.s", std::ios::out);
+        outfile << code;
+        outfile.close();
+
+        std::cout << "汇编代码已生成并写入 output.s" << std::endl;
 
     } catch (const std::exception& e) {
         // 【异常捕获】

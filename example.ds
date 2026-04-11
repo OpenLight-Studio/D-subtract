@@ -1,0 +1,12 @@
+let x = 10
+let y = 20
+if x {
+    x = x + 1
+}
+while y {
+    y = y - 1
+}
+def sum() {
+    x + y
+}
+sum()
