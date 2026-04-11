@@ -29,6 +29,5 @@ factor ::= number | float | id | id() | ( expr )
 
 ## 构建
 ```bash
-cd dsubtract
 cargo build --release
 ```
