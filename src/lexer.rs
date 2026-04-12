@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Number,
+    StringLiteral,
     Identifier,
     Plus,
     Minus,
@@ -10,10 +11,23 @@ pub enum TokenType {
     RParen,
     LBrace,
     RBrace,
-    Let,
+    LBracket,
+    RBracket,
+    LAngle,
+    RAngle,
+    Comma,
+    Semicolon,
+    Int,
+    Double,
+    String,
+    Bool,
+    Void,
+    Window,
+    Import,
     If,
     Else,
     While,
+    Return,
     Assign,
     End,
 }
@@ -25,6 +39,7 @@ pub struct Token {
     pub lexeme: String,
 }
 
+#[derive(Clone)]
 pub struct Lexer {
     input: Vec<char>,
     pos: usize,
@@ -65,6 +80,22 @@ impl Lexer {
                 }
                 return self.next_token();
             }
+            if c == '"' {
+                self.consume();
+                let mut str_val = String::new();
+                while let Some(ch) = self.peek() {
+                    if ch == '"' {
+                        self.consume();
+                        break;
+                    }
+                    str_val.push(self.consume().unwrap());
+                }
+                return Token {
+                    token_type: TokenType::StringLiteral,
+                    value: 0,
+                    lexeme: str_val,
+                };
+            }
             if c.is_ascii_digit() {
                 let mut num_str = String::new();
                 while let Some(ch) = self.peek() {
@@ -84,17 +115,24 @@ impl Lexer {
             if c.is_ascii_alphabetic() {
                 let mut lex = String::new();
                 while let Some(ch) = self.peek() {
-                    if ch.is_ascii_alphanumeric() {
+                    if ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' {
                         lex.push(self.consume().unwrap());
                     } else {
                         break;
                     }
                 }
                 let token_type = match lex.as_str() {
-                    "let" => TokenType::Let,
+                    "int" => TokenType::Int,
+                    "double" => TokenType::Double,
+                    "string" => TokenType::String,
+                    "bool" => TokenType::Bool,
+                    "void" => TokenType::Void,
+                    "window" => TokenType::Window,
+                    "import" => TokenType::Import,
                     "if" => TokenType::If,
                     "else" => TokenType::Else,
                     "while" => TokenType::While,
+                    "return" => TokenType::Return,
                     _ => TokenType::Identifier,
                 };
                 return Token {
@@ -113,8 +151,14 @@ impl Lexer {
                 ')' => TokenType::RParen,
                 '{' => TokenType::LBrace,
                 '}' => TokenType::RBrace,
+                '[' => TokenType::LBracket,
+                ']' => TokenType::RBracket,
+                '<' => TokenType::LAngle,
+                '>' => TokenType::RAngle,
+                ',' => TokenType::Comma,
+                ';' => TokenType::Semicolon,
                 '=' => TokenType::Assign,
-                _ => panic!("Unexpected char"),
+                _ => panic!("Unexpected char: {}", c),
             };
             Token {
                 token_type,

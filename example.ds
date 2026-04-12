@@ -1,12 +1,25 @@
-let x = 10
-let y = 20
-if x {
-    x = x + 1
+import <xxx.dh>
+import "/xxx.dh"
+
+int x,xx[5]={1,2,3,4,5};
+double y;
+string s;
+bool b;
+
+int sonProgram(int a){
+    a = a + 1;
+    return a;
 }
-while y {
-    y = y - 1
+void aaa(){
+    s = input();
 }
-def sum() {
-    x + y
+
+
+window [WindowName] [WindowIcon] [WindowTheme]{
+    //window applets
 }
-sum()
+
+void main(){
+    aaa();
+    output(sonProgram(5),s);
+}

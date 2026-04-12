@@ -1,28 +1,29 @@
-# D Substract (D--) 编程语言
-### 一个专门为Bigenner编写的编程语言
+# D-Subtract 编程语言
+### 一个专门为初学者编写的简单编程语言
 ###### Designed by OpenLight LLC with heart
 
 ## 功能
-- 解析和执行程序：支持变量声明（let）、数学表达式（+ - * / 括号）、while 循环
+- 解析和执行程序：支持类型化变量声明（int、double、string、bool）、数组、参数化函数、控制流（if/else、while）、导入语句、窗口声明、内置函数（input、output）
 - 编译为 x86-64 机器码：直接生成二进制代码
 
-## 语法
+## 语法概述
 ```
-program ::= statement*
-statement ::= let id = expr | def id() { program } | if expr { program } [else { program }] | while expr { program } | id = expr | expr
+program ::= import* declaration* function* window* main
+statement ::= declaration | function | if expr { statement* } [else { statement* }] | while expr { statement* } | return expr ; | id = expr ; | expr ; | function_call ;
 expr ::= term ((+|-) term)*
 term ::= factor ((*|/) factor)*
-factor ::= number | float | id | id() | ( expr )
+factor ::= number | string_literal | id | function_call | ( expr )
 ```
 
 注释：// 行注释
+
+详细语法请见 SYNTAX.md。
 
 ## 使用
 编译器将程序编译为 x86-64 机器码并写入 output.bin，然后直接运行。
 
 示例：
 ```
-./target/release/dsubtract "let x = 5"
 ./target/release/dsubtract example.ds
 ```
 生成机器码到 output.bin 并执行，打印退出码。

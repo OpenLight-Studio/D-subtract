@@ -1,27 +1,29 @@
-# D-- 编程语言语法文档
+# D-Subtract 编程语言语法文档
 
 ## 简介
 
-D-- 是一种为初学者设计的简单编程语言，由 OpenLight LLC 开发。它支持变量声明、数学运算、控制流和函数定义。D-- 代码被编译为 x86-64 机器码并直接执行。
+D-Subtract 是一种为初学者设计的简单编程语言，由 OpenLight LLC 开发。它支持变量声明、数学运算、控制流和函数定义。D-Subtract 代码被编译为 x86-64 机器码并直接执行。
 
 ## 基本语法结构
 
-D-- 程序由一系列语句组成，每个语句以分号或块结束。
+D-Subtract 程序由一系列语句组成，每个语句以分号或块结束。
 
 ### 程序结构
 ```
-program ::= statement*
+program ::= import* declaration* function* main
 ```
 
 ### 语句类型
-D-- 支持以下语句：
+D-Subtract 支持以下语句：
 
-1. **变量声明**：`let id = expr`
-2. **函数定义**：`def id() { program }`
-3. **条件语句**：`if expr { program } [else { program }]`
-4. **循环语句**：`while expr { program }`
-5. **赋值语句**：`id = expr`
-6. **表达式语句**：`expr`
+1. **Import 语句**：`import <file>` 或 `import "file"`
+2. **变量声明**：`type id [= init] [, id [= init]]* ;`
+3. **函数定义**：`return_type id(param_list) { statement* }`
+4. **条件语句**：`if expr { statement* } [else { statement* }]`
+5. **循环语句**：`while expr { statement* }`
+6. **赋值语句**：`id = expr ;`
+7. **表达式语句**：`expr ;`
+8. **Window 声明**：`window [name] [icon] [theme] { statement* }`
 
 ### 表达式
 表达式用于计算值，支持数学运算和变量引用。
@@ -29,29 +31,35 @@ D-- 支持以下语句：
 ```
 expr ::= term ((+|-) term)*
 term ::= factor ((*|/) factor)*
-factor ::= number | id | id() | ( expr )
+factor ::= number | string_literal | id | id(expr_list) | ( expr )
 ```
 
 - **运算符优先级**：
   - 高：`*`, `/`
   - 中：`+`, `-`
-  - 低：比较（如 `==`, `!=`, `<`, `<=`, `>`, `>=`）（当前实现中条件使用非零为真）
+  - 低：比较（如 `==`, `!=`, `<`, `<=`, `>`, `>=`）（条件使用非零为真）
 
 ## 数据类型
 
-- **整数**：如 `5`, `10`，64 位有符号整数。
-- **浮点数**：如 `3.14`，但当前编译器不支持浮点运算。
-- **布尔值**：通过整数表示，0 为假，非 0 为真。
+- **int**：64 位有符号整数，如 `5`, `10`
+- **double**：64 位浮点数，如 `3.14`
+- **string**：字符串，如 `"hello"`
+- **bool**：布尔值，`true` 或 `false`
 
-变量类型由赋值决定，无显式类型声明。
+变量必须显式声明类型。支持数组：`type id[size] = {init_list}`
 
 ## 关键字
 
-- `let`：变量声明
-- `def`：函数定义
+- `int`：整数类型
+- `double`：浮点类型
+- `string`：字符串类型
+- `bool`：布尔类型
+- `void`：无返回值类型
 - `if`：条件语句
 - `else`：条件语句可选部分
 - `while`：循环语句
+- `window`：窗口声明
+- `import`：导入文件
 
 ## 标识符
 
@@ -70,75 +78,60 @@ let x = 5  // 变量声明
 
 ### 简单变量和运算
 ```
-let x = 5
-let y = x + 10
-y
-```
-
-### 条件语句
-```
-let x = 10
-if x {
-    x = x + 1
-} else {
-    x = x - 1
-}
-```
-
-### 循环
-```
-let x = 5
-while x {
-    x = x - 1
-}
+int x = 5;
+double y = 3.14;
+string s = "hello";
+bool b = true;
+int arr[5] = {1,2,3,4,5};
 ```
 
 ### 函数定义和调用
 ```
-def sum() {
-    let a = 10
-    let b = 20
-    a + b
+int sonProgram(int a) {
+    a++;
+    return a;
 }
-sum()
+void aaa() {
+    s = input();
+}
+void main() {
+    aaa();
+    output(sonProgram(5), s);
+}
 ```
 
-### 复杂示例
+### Window 声明
 ```
-let x = 10
-let y = 20
-def add() {
-    x + y
+window [MainWindow] [icon.png] [dark] {
+    // window applets
 }
-if x {
-    x = add()
-} else {
-    y = 0
-}
-while y {
-    y = y - 1
-}
+```
+
+### Import
+```
+import <math.dh>
+import "/lib/io.dh"
 ```
 
 ## 语法规则细节
 
-- **语句分隔**：语句之间不需要分号，但表达式语句后可以有。
+- **语句分隔**：语句以分号 `;` 结束。
 - **块**：使用 `{}` 包围语句块。
 - **作用域**：变量在声明后可见，函数内变量局部。
 - **错误处理**：语法错误会导致编译失败，运行时错误未定义行为。
 - **限制**：
-  - 函数无参数。
-  - 无字符串或数组。
-  - 浮点数解析但不运算。
+  - 支持函数参数和返回值。
+  - 支持字符串和数组。
+  - 支持浮点运算。
   - 递归调用可能导致栈溢出。
 
 ## 扩展建议
 
 未来可以添加：
-- 函数参数。
-- 返回语句。
-- 更多数据类型。
-- 标准库函数。
+- 更多内置函数。
+- 类和对象。
+- 异常处理。
+- 标准库模块。
 
 ## 编译和运行
 
@@ -146,7 +139,7 @@ while y {
 
 ```bash
 cargo build --release
-./target/release/dsubtract "let x = 5"
+./target/release/dsubtract example.ds
 ```
 
 更多详情见 README.md。

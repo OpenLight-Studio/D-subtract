@@ -1,10 +1,28 @@
 use crate::lexer::{Lexer, Token, TokenType};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Int,
+    Double,
+    String,
+    Bool,
+    Void,
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: String,
+    pub return_type: Type,
+    pub params: Vec<(String, Type)>,
+    pub start_label: String,
+}
+
 pub struct Parser {
     lexer: Lexer,
     current: Token,
-    variables: HashMap<String, i32>,
+    variables: HashMap<String, (Type, i32)>, // type and offset
+    functions: HashMap<String, Function>,
     stack_size: i32,
     label_count: i32,
     labels: HashMap<String, usize>,
@@ -20,6 +38,7 @@ impl Parser {
             lexer,
             current,
             variables: HashMap::new(),
+            functions: HashMap::new(),
             stack_size: 0,
             label_count: 0,
             labels: HashMap::new(),
@@ -28,8 +47,8 @@ impl Parser {
         }
     }
 
-    fn eat(&mut self, token_type: TokenType) {
-        if self.current.token_type == token_type {
+    fn eat(&mut self, token_type: &TokenType) {
+        if self.current.token_type == *token_type {
             self.current = self.lexer.next_token();
         } else {
             panic!("Parse error");
@@ -219,40 +238,206 @@ impl Parser {
 
     fn parse_program(&mut self) {
         while self.current.token_type != TokenType::End {
-            self.parse_statement();
+            match self.current.token_type {
+                TokenType::Import => self.parse_import(),
+                TokenType::Int
+                | TokenType::Double
+                | TokenType::String
+                | TokenType::Bool
+                | TokenType::Void => {
+                    if self.peek_next_is_lparen() {
+                        self.parse_function();
+                    } else {
+                        self.parse_declaration();
+                    }
+                }
+                TokenType::Window => self.parse_window(),
+                _ => self.parse_statement(),
+            }
         }
+    }
+
+    fn parse_import(&mut self) {
+        self.eat(&TokenType::Import);
+        // For simplicity, skip import for now
+        if self.current.token_type == TokenType::LAngle {
+            self.eat(&TokenType::LAngle);
+            self.eat(&TokenType::Identifier);
+            self.eat(&TokenType::RAngle);
+        } else if self.current.token_type == TokenType::StringLiteral {
+            self.eat(&TokenType::StringLiteral);
+        } else {
+            self.eat(&TokenType::Identifier);
+        }
+        self.eat(&TokenType::Semicolon);
+    }
+
+    fn parse_declaration(&mut self) {
+        let var_type = self.parse_type();
+        loop {
+            let name = self.current.lexeme.clone();
+            self.eat(&TokenType::Identifier);
+            if self.current.token_type == TokenType::LBracket {
+                self.eat(&TokenType::LBracket);
+                let _size = self.current.value as i32;
+                self.eat(&TokenType::Number);
+                self.eat(&TokenType::RBracket);
+                if self.current.token_type == TokenType::Assign {
+                    self.eat(&TokenType::Assign);
+                    self.eat(&TokenType::LBrace);
+                    // Parse array init, for simplicity skip
+                    while self.current.token_type != TokenType::RBrace {
+                        if self.current.token_type == TokenType::Number {
+                            self.eat(&TokenType::Number);
+                        }
+                        if self.current.token_type == TokenType::Comma {
+                            self.eat(&TokenType::Comma);
+                        } else {
+                            break;
+                        }
+                    }
+                    self.eat(&TokenType::RBrace);
+                }
+            }
+            self.allocate_var(&name, var_type.clone());
+            if self.current.token_type == TokenType::Comma {
+                self.eat(&TokenType::Comma);
+            } else {
+                break;
+            }
+        }
+        self.eat(&TokenType::Semicolon);
+    }
+
+    fn parse_function(&mut self) {
+        let return_type = self.parse_type();
+        let name = self.current.lexeme.clone();
+        self.eat(&TokenType::Identifier);
+        self.eat(&TokenType::LParen);
+        let mut params = Vec::new();
+        while self.current.token_type != TokenType::RParen {
+            let param_type = self.parse_type();
+            let param_name = self.current.lexeme.clone();
+            self.eat(&TokenType::Identifier);
+            params.push((param_name, param_type));
+            if self.current.token_type == TokenType::Comma {
+                self.eat(&TokenType::Comma);
+            }
+        }
+        self.eat(&TokenType::RParen);
+        self.eat(&TokenType::LBrace);
+        let func = Function {
+            name: name.clone(),
+            return_type,
+            params,
+            start_label: self.new_label(),
+        };
+        self.functions.insert(name, func);
+        self.parse_program_block();
+        self.eat(&TokenType::RBrace);
+    }
+
+    fn parse_window(&mut self) {
+        self.eat(&TokenType::Window);
+        self.eat(&TokenType::LBracket);
+        self.eat(&TokenType::Identifier); // name
+        self.eat(&TokenType::RBracket);
+        self.eat(&TokenType::LBracket);
+        self.eat(&TokenType::Identifier); // icon
+        self.eat(&TokenType::RBracket);
+        self.eat(&TokenType::LBracket);
+        self.eat(&TokenType::Identifier); // theme
+        self.eat(&TokenType::RBracket);
+        self.eat(&TokenType::LBrace);
+        self.parse_program_block();
+        self.eat(&TokenType::RBrace);
+    }
+
+    fn parse_return(&mut self) {
+        self.eat(&TokenType::Return);
+        self.parse_expression();
+        self.emit_ret();
+        self.eat(&TokenType::Semicolon);
+    }
+
+    fn parse_assignment_or_call(&mut self) {
+        let name = self.current.lexeme.clone();
+        self.eat(&TokenType::Identifier);
+        if self.current.token_type == TokenType::Assign {
+            self.eat(&TokenType::Assign);
+            self.parse_expression();
+            if let Some(&(ref _var_type, offset)) = self.variables.get(&name) {
+                self.emit_mov_rbp_offset_rax(offset);
+            } else {
+                panic!("Undefined variable: {}", name);
+            }
+            self.eat(&TokenType::Semicolon);
+        } else if self.current.token_type == TokenType::LParen {
+            self.eat(&TokenType::LParen);
+            // Parse args
+            while self.current.token_type != TokenType::RParen {
+                self.parse_expression();
+                if self.current.token_type == TokenType::Comma {
+                    self.eat(&TokenType::Comma);
+                }
+            }
+            self.eat(&TokenType::RParen);
+            self.emit_call(&name);
+            self.emit_push_rax();
+            if self.current.token_type == TokenType::Semicolon {
+                self.eat(&TokenType::Semicolon);
+            }
+        } else {
+            panic!("Expected assignment or function call");
+        }
+    }
+
+    fn peek_next_is_lparen(&mut self) -> bool {
+        // Simple peek ahead for '('
+        let mut temp_lexer = self.lexer.clone();
+        let mut temp_current = self.current.clone();
+        while temp_current.token_type != TokenType::End {
+            if temp_current.token_type == TokenType::LParen {
+                return true;
+            }
+            if temp_current.token_type == TokenType::Identifier
+                || matches!(
+                    temp_current.token_type,
+                    TokenType::Int
+                        | TokenType::Double
+                        | TokenType::String
+                        | TokenType::Bool
+                        | TokenType::Void
+                )
+            {
+                continue;
+            }
+            break;
+        }
+        false
     }
 
     fn parse_statement(&mut self) {
         match self.current.token_type {
-            TokenType::Let => self.parse_let(),
             TokenType::While => self.parse_while(),
             TokenType::If => self.parse_if(),
-            TokenType::Identifier => self.parse_assignment(),
-            _ => self.parse_expression(),
-        }
-    }
-
-    fn parse_let(&mut self) {
-        self.eat(TokenType::Let);
-        if let TokenType::Identifier = self.current.token_type {
-            let name = self.current.lexeme.clone();
-            self.eat(TokenType::Identifier);
-            self.eat(TokenType::Assign);
-            self.parse_expression();
-            let offset = self.allocate_var(&name);
-            self.emit_mov_rbp_offset_rax(offset);
-        } else {
-            panic!("Expected identifier");
+            TokenType::Return => self.parse_return(),
+            TokenType::Identifier => self.parse_assignment_or_call(),
+            _ => {
+                self.parse_expression();
+                if self.current.token_type == TokenType::Semicolon {
+                    self.eat(&TokenType::Semicolon);
+                }
+            }
         }
     }
 
     fn parse_assignment(&mut self) {
         let name = self.current.lexeme.clone();
-        self.eat(TokenType::Identifier);
-        self.eat(TokenType::Assign);
+        self.eat(&TokenType::Identifier);
+        self.eat(&TokenType::Assign);
         self.parse_expression();
-        if let Some(&offset) = self.variables.get(&name) {
+        if let Some(&(ref _var_type, offset)) = self.variables.get(&name) {
             self.emit_mov_rbp_offset_rax(offset);
         } else {
             panic!("Undefined variable: {}", name);
@@ -260,22 +445,22 @@ impl Parser {
     }
 
     fn parse_if(&mut self) {
-        self.eat(TokenType::If);
+        self.eat(&TokenType::If);
         let else_label = self.new_label();
         let end_label = self.new_label();
         self.parse_expression();
         self.emit_test_rax();
         self.emit_je(&else_label);
-        self.eat(TokenType::LBrace);
+        self.eat(&TokenType::LBrace);
         self.parse_program_block();
-        self.eat(TokenType::RBrace);
+        self.eat(&TokenType::RBrace);
         if self.current.token_type == TokenType::Else {
-            self.eat(TokenType::Else);
+            self.eat(&TokenType::Else);
             self.emit_jmp(&end_label);
             self.emit_label(&else_label);
-            self.eat(TokenType::LBrace);
+            self.eat(&TokenType::LBrace);
             self.parse_program_block();
-            self.eat(TokenType::RBrace);
+            self.eat(&TokenType::RBrace);
             self.emit_label(&end_label);
         } else {
             self.emit_label(&else_label);
@@ -283,16 +468,16 @@ impl Parser {
     }
 
     fn parse_while(&mut self) {
-        self.eat(TokenType::While);
+        self.eat(&TokenType::While);
         let start_label = self.new_label();
         let end_label = self.new_label();
         self.emit_label(&start_label);
         self.parse_expression();
         self.emit_test_rax();
         self.emit_je(&end_label);
-        self.eat(TokenType::LBrace);
+        self.eat(&TokenType::LBrace);
         self.parse_program_block();
-        self.eat(TokenType::RBrace);
+        self.eat(&TokenType::RBrace);
         self.emit_jmp(&start_label);
         self.emit_label(&end_label);
     }
@@ -309,7 +494,7 @@ impl Parser {
         self.parse_term();
         while matches!(self.current.token_type, TokenType::Plus | TokenType::Minus) {
             let op = self.current.token_type.clone();
-            self.eat(op);
+            self.eat(&op);
             self.parse_term();
             self.emit_pop_rbx();
             self.emit_pop_rax();
@@ -326,7 +511,7 @@ impl Parser {
         self.parse_factor();
         while matches!(self.current.token_type, TokenType::Star | TokenType::Slash) {
             let op = self.current.token_type.clone();
-            self.eat(op);
+            self.eat(&op);
             self.parse_factor();
             self.emit_pop_rbx();
             self.emit_pop_rax();
@@ -343,20 +528,24 @@ impl Parser {
         match self.current.token_type {
             TokenType::Number => {
                 let val = self.current.value;
-                self.eat(TokenType::Number);
+                self.eat(&TokenType::Number);
                 self.emit_mov_rax_imm(val);
+                self.emit_push_rax();
+            }
+            TokenType::StringLiteral => {
+                // For simplicity, treat as number for now
+                self.eat(&TokenType::StringLiteral);
+                self.emit_mov_rax_imm(0);
                 self.emit_push_rax();
             }
             TokenType::Identifier => {
                 let name = self.current.lexeme.clone();
-                self.eat(TokenType::Identifier);
+                self.eat(&TokenType::Identifier);
                 if self.current.token_type == TokenType::LParen {
-                    self.eat(TokenType::LParen);
-                    self.eat(TokenType::RParen);
-                    self.emit_call(&name);
-                    self.emit_push_rax();
+                    // Function call, already handled in parse_assignment_or_call
+                    panic!("Unexpected function call in factor");
                 } else {
-                    if let Some(&offset) = self.variables.get(&name) {
+                    if let Some(&(ref _var_type, offset)) = self.variables.get(&name) {
                         self.emit_mov_rax_rbp_offset(offset);
                         self.emit_push_rax();
                     } else {
@@ -365,20 +554,47 @@ impl Parser {
                 }
             }
             TokenType::LParen => {
-                self.eat(TokenType::LParen);
+                self.eat(&TokenType::LParen);
                 self.parse_expression();
-                self.eat(TokenType::RParen);
+                self.eat(&TokenType::RParen);
             }
             _ => panic!("Expected factor"),
         }
     }
 
-    fn allocate_var(&mut self, name: &str) -> i32 {
+    fn parse_type(&mut self) -> Type {
+        match self.current.token_type {
+            TokenType::Int => {
+                self.eat(&TokenType::Int);
+                Type::Int
+            }
+            TokenType::Double => {
+                self.eat(&TokenType::Double);
+                Type::Double
+            }
+            TokenType::String => {
+                self.eat(&TokenType::String);
+                Type::String
+            }
+            TokenType::Bool => {
+                self.eat(&TokenType::Bool);
+                Type::Bool
+            }
+            TokenType::Void => {
+                self.eat(&TokenType::Void);
+                Type::Void
+            }
+            _ => panic!("Expected type"),
+        }
+    }
+
+    fn allocate_var(&mut self, name: &str, var_type: Type) -> i32 {
         if self.variables.contains_key(name) {
             panic!("Variable already declared: {}", name);
         }
         self.stack_size += 8;
-        self.variables.insert(name.to_string(), self.stack_size);
+        self.variables
+            .insert(name.to_string(), (var_type, self.stack_size));
         self.stack_size
     }
 }
