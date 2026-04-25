@@ -36,7 +36,11 @@ pub enum TokenType {
     Catch,
     Throw,
     Return,
+    For,
     Assign,
+    PlusAssign,
+    LAngleAngle,
+    RAngleAngle,
     End,
 }
 
@@ -147,6 +151,7 @@ impl Lexer {
                     "catch" => TokenType::Catch,
                     "throw" => TokenType::Throw,
                     "return" => TokenType::Return,
+                    "for" => TokenType::For,
                     _ => TokenType::Identifier,
                 };
                 return Token {
@@ -157,7 +162,30 @@ impl Lexer {
             }
             self.consume();
             let token_type = match c {
-                '+' => TokenType::Plus,
+                '+' => {
+                    if let Some(&'=') = self.input.get(self.pos) {
+                        self.consume();
+                        TokenType::PlusAssign
+                    } else {
+                        TokenType::Plus
+                    }
+                }
+                '<' => {
+                    if let Some(&'<') = self.input.get(self.pos) {
+                        self.consume();
+                        TokenType::LAngleAngle
+                    } else {
+                        TokenType::LAngle
+                    }
+                }
+                '>' => {
+                    if let Some(&'>') = self.input.get(self.pos) {
+                        self.consume();
+                        TokenType::RAngleAngle
+                    } else {
+                        TokenType::RAngle
+                    }
+                }
                 '-' => TokenType::Minus,
                 '*' => TokenType::Star,
                 '/' => TokenType::Slash,

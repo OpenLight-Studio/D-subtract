@@ -1,15 +1,7 @@
 import <dsub:libio>
-import <dsub:window>
-
-void a(){
-    log("add a log!");
-}
-
-window MainWindow icon.png dark 640 480{
-    windowBlock raw=1 10*320 center{
-        text "This is a panel"
-    }
-    windowBlock raw=2 10*10 left{
-        button "Click me" --> a();
-    }
+void main(){
+    int a;
+    input<<"Please enter a number: ">>a;
+    for(int i=1;i<=a;i++)a+=i;
+    output<<"The sum is: "<<a<<endl;
 }
